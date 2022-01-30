@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">SenseTestApp</string>
+    <string name="recent_files">Recent files</string>
+    <string name="open_file">Open file</string>
 </resources>

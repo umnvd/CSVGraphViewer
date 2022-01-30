@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <declare-styleable name="PlotView">
+        <attr name="axesPadding" format="dimension" />
+        <attr name="textSize" format="dimension" />
+        <attr name="axesColor" format="color" />
+        <attr name="gridColor" format="color" />
+        <attr name="graphColor" format="color" />
+        <attr name="textColor" format="color" />
+    </declare-styleable>
+
+    <attr name="plotViewStyle" format="reference" />
+
+    <style name="PlotViewDefaultStyle">
+        <item name="axesPadding">50dp</item>
+        <item name="textSize">14sp</item>
+        <item name="axesColor">#000000</item>
+        <item name="gridColor">#808080</item>
+        <item name="graphColor">#4444FF</item>
+        <item name="textColor">#000000</item>
+    </style>
+
+</resources>

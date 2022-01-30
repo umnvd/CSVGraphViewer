@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <dimen name="text">18sp</dimen>
+    <dimen name="padding">8dp</dimen>
+
+    <dimen name="default_grid_step">100dp</dimen>
+</resources>
