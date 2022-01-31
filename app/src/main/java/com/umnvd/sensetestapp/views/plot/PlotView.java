@@ -1,12 +1,16 @@
 package com.umnvd.sensetestapp.views.plot;
 
+import android.annotation.SuppressLint;
 import android.content.Context;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PointF;
 import android.graphics.RectF;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -14,6 +18,7 @@ import androidx.annotation.Nullable;
 
 import com.umnvd.sensetestapp.R;
 import com.umnvd.sensetestapp.models.DataPoint;
+import static com.umnvd.sensetestapp.utils.Utils.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -26,6 +31,9 @@ public class PlotView extends View {
     private int gridColor;
     private int graphColor;
     private int textColor;
+    private float axesWidth;
+    private float gridWidth;
+    private float graphWidth;
 
     private final List<PlotPoint> graphPoints = new ArrayList<>();
     private final List<PlotPoint> xAxisPoints = new ArrayList<>();
@@ -37,7 +45,6 @@ public class PlotView extends View {
 
     private float maxXTextWidth;
     private float maxYTextWidth;
-    private float textHeight;
     private float textCenterDeviation;
 
     private int xGridStepMultiplier = 1;
@@ -46,17 +53,22 @@ public class PlotView extends View {
     private int xAxisShift = 0;
     private int yAxisShift = 0;
 
+    private final ScaleGestureDetector scaleGestureDetector =
+            new ScaleGestureDetector(getContext(), new ScaleListener());
+    private final PointF lastEventPoint = new PointF();
+    private int lastPointerId;
+
+    private float scale = 1f;
+    private float maxScale = 2f;
     private float translationX = 0f;
     private float translationY = 0f;
-    private float scale = 1f;
 
     private final Paint axesPaint = new Paint();
     private final Paint gridPaint = new Paint();
     private final Paint graphPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private final int defaultGridStep =
-            getContext().getResources().getDimensionPixelSize(R.dimen.default_grid_step);
+    private final float maxGridStep = getContext().getResources().getDimension(R.dimen.max_grid_step);
 
     public PlotView(Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
@@ -76,12 +88,6 @@ public class PlotView extends View {
         this(context, null);
     }
 
-    public void setPoints(@NonNull List<DataPoint> points) {
-        setUpPlot(points);
-        requestLayout();
-        invalidate();
-    }
-
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int measuredWidth, measuredHeight;
@@ -89,7 +95,7 @@ public class PlotView extends View {
         if (MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED) {
             int paddings = getPaddingLeft() + getPaddingRight();
             int stepsCount = Math.max(xAxisPoints.size(), 1);
-            measuredWidth = (defaultGridStep * stepsCount) + paddings;
+            measuredWidth = ((int) (maxGridStep * stepsCount)) + paddings;
         } else {
             measuredWidth = MeasureSpec.getSize(widthMeasureSpec);
         }
@@ -97,7 +103,7 @@ public class PlotView extends View {
         if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
             int paddings = getPaddingTop() + getPaddingBottom();
             int stepsCount = Math.max(yAxisPoints.size(), 1);
-            measuredHeight = (defaultGridStep * stepsCount) + paddings;
+            measuredHeight = ((int) (maxGridStep * stepsCount)) + paddings;
         } else {
             measuredHeight = MeasureSpec.getSize(heightMeasureSpec);
         }
@@ -107,19 +113,21 @@ public class PlotView extends View {
 
     @Override
     protected void onSizeChanged(int w, int h, int oldW, int oldH) {
-        float plotLeftBottomPadding = Math.max((maxYTextWidth * 2f), (textHeight * 2f));
-        float plotTopPadding = textHeight / 1.5f;
+        float plotLeftPadding = (textSize / 2f) + maxYTextWidth;
+        float plotTopPadding = textSize / 1.5f;
         float plotRightPadding = maxXTextWidth / 1.5f;
+        float plotBottomPadding = (textSize / 2f) + textSize;
 
         plotRect.set(
-                getPaddingLeft() + plotLeftBottomPadding,
+                getPaddingLeft() + plotLeftPadding,
                 getPaddingTop() + plotTopPadding,
                 w - getPaddingRight() - plotRightPadding,
-                h - getPaddingBottom() - plotLeftBottomPadding
+                h - getPaddingBottom() - plotBottomPadding
         );
 
         stepX = plotRect.width() / Math.max((xAxisPoints.size() - 1), 1);
         stepY = plotRect.height() / Math.max((yAxisPoints.size() - 1), 1);
+        maxScale = maxGridStep / Math.min(stepX, stepY);
 
         updatePlot();
     }
@@ -127,8 +135,27 @@ public class PlotView extends View {
     @Override
     protected void onDraw(Canvas canvas) {
         drawGrid(canvas);
+
+        canvas.save();
+        canvas.clipRect(plotRect);
         drawGraph(canvas);
+        canvas.restore();
+
         drawAxesAndMarks(canvas);
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event == null) return false;
+        if (event.getPointerCount() > 1) return scaleGestureDetector.onTouchEvent(event);
+        return processTranslation(event);
+    }
+
+    public void setPoints(@NonNull List<DataPoint> points) {
+        setUpPlotPoints(points);
+        requestLayout();
+        invalidate();
     }
 
     private void initAttributes(@Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
@@ -136,11 +163,14 @@ public class PlotView extends View {
                 attrs, R.styleable.PlotView, defStyleAttr, defStyleRes
         );
 
-        textSize = typedArray.getDimension(R.styleable.PlotView_textSize, 14);
+        textSize = typedArray.getDimension(R.styleable.PlotView_textSize, 48f);
         axesColor = typedArray.getColor(R.styleable.PlotView_axesColor, Color.BLACK);
         gridColor = typedArray.getColor(R.styleable.PlotView_gridColor, Color.LTGRAY);
         graphColor = typedArray.getColor(R.styleable.PlotView_graphColor, Color.BLUE);
         textColor = typedArray.getColor(R.styleable.PlotView_textColor, Color.BLACK);
+        axesWidth = typedArray.getDimension(R.styleable.PlotView_axesWidth, 8f);
+        gridWidth = typedArray.getDimension(R.styleable.PlotView_gridWidth, 4f);
+        graphWidth = typedArray.getDimension(R.styleable.PlotView_graphWidth, 8f);
 
         typedArray.recycle();
     }
@@ -148,22 +178,22 @@ public class PlotView extends View {
     private void configurePaints() {
         axesPaint.setColor(axesColor);
         axesPaint.setStyle(Paint.Style.STROKE);
-        axesPaint.setStrokeWidth(8);
+        axesPaint.setStrokeWidth(axesWidth);
 
         gridPaint.setColor(gridColor);
         gridPaint.setStyle(Paint.Style.STROKE);
-        gridPaint.setStrokeWidth(4);
+        gridPaint.setStrokeWidth(gridWidth);
 
         graphPaint.setColor(graphColor);
         graphPaint.setStyle(Paint.Style.STROKE);
-        graphPaint.setStrokeWidth(8);
+        graphPaint.setStrokeWidth(graphWidth);
 
         textPaint.setColor(textColor);
         textPaint.setStyle(Paint.Style.FILL);
         textPaint.setTextSize(textSize);
     }
 
-    private void setUpPlot(List<DataPoint> originalDataPoints) {
+    private void setUpPlotPoints(List<DataPoint> originalDataPoints) {
         ArrayList<DataPoint> dataPoints = new ArrayList<>(originalDataPoints);
         Collections.sort(dataPoints);
 
@@ -197,12 +227,12 @@ public class PlotView extends View {
 
     private void setUpAxesPoints(DataPoint minAxesPoint, DataPoint maxAxesPoint) {
         xAxisPoints.clear();
-        for (int x = minAxesPoint.x; x <= maxAxesPoint.x; x++) {
+        for (int x = minAxesPoint.x; x <= maxAxesPoint.x + 1; x++) {
             xAxisPoints.add(new PlotPoint(x, yAxisShift));
         }
 
         yAxisPoints.clear();
-        for (int y = minAxesPoint.y; y <= maxAxesPoint.y; y++) {
+        for (int y = minAxesPoint.y; y <= maxAxesPoint.y + 1; y++) {
             yAxisPoints.add(new PlotPoint(xAxisShift, y));
         }
     }
@@ -222,8 +252,12 @@ public class PlotView extends View {
         maxYTextWidth = Math.max(textPaint.measureText(minYText), textPaint.measureText(maxYText));
 
         Paint.FontMetrics fontMetrics = textPaint.getFontMetrics();
-        textHeight = fontMetrics.descent - fontMetrics.ascent;
         textCenterDeviation = (fontMetrics.descent + fontMetrics.ascent) / 2f;
+    }
+
+    private void updateAndInvalidate() {
+        updatePlot();
+        invalidate();
     }
 
     private void updatePlot() {
@@ -242,7 +276,7 @@ public class PlotView extends View {
 
         yGridStepMultiplier = 1;
         while (true) {
-            if (stepY * scale * yGridStepMultiplier > textHeight * 1.25f) break;
+            if (stepY * scale * yGridStepMultiplier > textSize * 1.25f) break;
             else yGridStepMultiplier++;
         }
     }
@@ -250,14 +284,14 @@ public class PlotView extends View {
     private void drawGrid(Canvas canvas) {
         for (int i = 0; i < xAxisPoints.size(); i += xGridStepMultiplier) {
             PlotPoint point = xAxisPoints.get(i);
-            if (point.isVisible) {
+            if (isLineOnPlot(point.x, plotRect.top, point.x, plotRect.bottom)) {
                 canvas.drawLine(point.x, plotRect.top, point.x, plotRect.bottom, gridPaint);
             }
         }
 
         for (int i = 0; i < yAxisPoints.size(); i += yGridStepMultiplier) {
             PlotPoint point = yAxisPoints.get(i);
-            if (point.isVisible) {
+            if (isLineOnPlot(plotRect.left, point.y, plotRect.right, point.y)) {
                 canvas.drawLine(plotRect.left, point.y, plotRect.right, point.y, gridPaint);
             }
         }
@@ -267,7 +301,7 @@ public class PlotView extends View {
         for (int i = 1; i < graphPoints.size(); i++) {
             PlotPoint fromPoint = graphPoints.get(i - 1);
             PlotPoint toPoint = graphPoints.get(i);
-            if (fromPoint.isVisible || toPoint.isVisible) {
+            if (isLineOnPlot(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y)) {
                 canvas.drawLine(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y, graphPaint);
             }
         }
@@ -278,20 +312,15 @@ public class PlotView extends View {
 
         for (int i = 0; i < xAxisPoints.size(); i += xGridStepMultiplier) {
             PlotPoint point = xAxisPoints.get(i);
-            if (point.isVisible) {
-                canvas.drawLine(
-                        point.x,
-                        plotRect.bottom - textHeight / 2f,
-                        point.x,
-                        plotRect.bottom + textHeight / 2f,
-                        axesPaint
-                );
-
+            float markStartY = plotRect.bottom - textSize / 2f;
+            float markStopY = plotRect.bottom + textSize / 2f;
+            if (isLineOnPlot(point.x, markStartY, point.x, markStopY)) {
+                canvas.drawLine(point.x, markStartY, point.x, markStopY, axesPaint);
                 textPaint.setTextAlign(Paint.Align.CENTER);
                 canvas.drawText(
                         String.valueOf(point.originalX),
                         point.x,
-                        plotRect.bottom + textHeight * 2,
+                        plotRect.bottom + textSize - textCenterDeviation,
                         textPaint
                 );
             }
@@ -299,19 +328,14 @@ public class PlotView extends View {
 
         for (int i = 0; i < yAxisPoints.size(); i += yGridStepMultiplier) {
             PlotPoint point = yAxisPoints.get(i);
-            if (point.isVisible) {
-                canvas.drawLine(
-                        plotRect.left - textHeight / 2f,
-                        point.y,
-                        plotRect.left + textHeight / 2f,
-                        point.y,
-                        axesPaint
-                );
-
+            float markStartX = plotRect.left - textSize / 2f;
+            float markStopX = plotRect.left + textSize / 2f;
+            if (isLineOnPlot(markStartX, point.y, markStopX, point.y)) {
+                canvas.drawLine(markStartX, point.y, markStopX, point.y, axesPaint);
                 textPaint.setTextAlign(Paint.Align.RIGHT);
                 canvas.drawText(
                         String.valueOf(point.originalY),
-                        plotRect.left - maxYTextWidth,
+                        plotRect.left - textSize / 2f,
                         point.y - textCenterDeviation,
                         textPaint
                 );
@@ -319,14 +343,65 @@ public class PlotView extends View {
         }
     }
 
-    public class PlotPoint {
+    private boolean isLineOnPlot(float x1, float y1, float x2, float y2) {
+        return plotRect.left <= Math.max(x1, x2)
+                && Math.min(x1, x2) <= plotRect.right
+                && plotRect.top < Math.max(y1, y2)
+                && Math.min(y1, y2) < plotRect.bottom;
+    }
+
+    private boolean processTranslation(MotionEvent event) {
+        if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            lastEventPoint.set(event.getX(), event.getY());
+            lastPointerId = event.getPointerId(0);
+            return true;
+        }
+
+        if (event.getAction() == MotionEvent.ACTION_MOVE) {
+            if (scale > 1f) {
+                int pointerId = event.getPointerId(0);
+
+                if (pointerId == lastPointerId) {
+                    translationX += event.getX() - lastEventPoint.x;
+                    translationY += event.getY() - lastEventPoint.y;
+                    restrictTranslations();
+                    updateAndInvalidate();
+                }
+
+                lastEventPoint.set(event.getX(), event.getY());
+                lastPointerId = event.getPointerId(0);
+                return true;
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    private void restrictTranslations() {
+        translationX = coerceIn(
+                plotRect.right - plotRect.right * scale,
+                translationX,
+                plotRect.left * scale - plotRect.left
+        );
+        translationY = coerceIn(
+                plotRect.top - plotRect.top * scale,
+                translationY,
+                plotRect.bottom * scale - plotRect.bottom
+        );
+    }
+
+    private float coerceIn(float minValue, float value,float maxValue) {
+        return Math.max(Math.min(maxValue, value), minValue);
+    }
+
+    private class PlotPoint {
 
         public final int originalX;
         public final int originalY;
 
         public float x;
         public float y;
-        public boolean isVisible;
 
         public PlotPoint(int originalX, int originalY) {
             this.originalX = originalX;
@@ -341,8 +416,19 @@ public class PlotView extends View {
         public void update() {
             x = plotRect.left + ((originalX - xAxisShift) * stepX * scale) + translationX;
             y = plotRect.bottom - ((originalY - yAxisShift) * stepY * scale) + translationY;
-            isVisible = x >= plotRect.left && x <= plotRect.right
-                    && y >= plotRect.top && y <= plotRect.bottom;
+        }
+
+    }
+
+    private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
+
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            if (detector == null) return false;
+            scale = coerceIn(1f, scale * detector.getScaleFactor(), maxScale);
+            restrictTranslations();
+            updateAndInvalidate();
+            return true;
         }
 
     }

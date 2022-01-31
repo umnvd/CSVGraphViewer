@@ -12,10 +12,10 @@ public class TestPointsGenerator {
 
     public List<DataPoint> generatePoints() {
         List<DataPoint> result = new ArrayList<>();
-        for (int i = 0; i < 25; i++) {
+        for (int i = 0; i < 100; i++) {
             result.add(new DataPoint(
-                    random.nextInt(25),
-                    random.nextInt(25)
+                    i,
+                    i*i
 //                    i, i
             ));
         }

@@ -3,5 +3,5 @@
     <dimen name="text">18sp</dimen>
     <dimen name="padding">8dp</dimen>
 
-    <dimen name="default_grid_step">100dp</dimen>
+    <dimen name="max_grid_step">100dp</dimen>
 </resources>
