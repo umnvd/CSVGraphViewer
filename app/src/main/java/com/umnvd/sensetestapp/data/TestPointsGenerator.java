@@ -14,8 +14,8 @@ public class TestPointsGenerator {
         List<DataPoint> result = new ArrayList<>();
         for (int i = 0; i < 25; i++) {
             result.add(new DataPoint(
-                    random.nextInt(10) - 5,
-                    random.nextInt(20) - 10
+                    random.nextInt(25),
+                    random.nextInt(25)
 //                    i, i
             ));
         }
