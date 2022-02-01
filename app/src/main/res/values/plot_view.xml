@@ -16,10 +16,10 @@
 
     <style name="PlotViewDefaultStyle">
         <item name="textSize">16sp</item>
-        <item name="axesColor">#000000</item>
-        <item name="gridColor">#CCCCCC</item>
-        <item name="graphColor">#4444FF</item>
-        <item name="textColor">#000000</item>
+        <item name="axesColor">?android:textColorPrimary</item>
+        <item name="gridColor">#80888888</item>
+        <item name="graphColor">?android:colorPrimary</item>
+        <item name="textColor">?android:textColorPrimary</item>
         <item name="axesWidth">3dp</item>
         <item name="gridWidth">1.5dp</item>
         <item name="graphWidth">3dp</item>

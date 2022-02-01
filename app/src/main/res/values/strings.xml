@@ -1,5 +1,10 @@
 <resources>
-    <string name="app_name">SenseTestApp</string>
+    <string name="app_name">CSV Graph Viewer</string>
     <string name="recent_files">Recent files</string>
-    <string name="open_file">Open file</string>
+    <string name="choose_file">Choose file</string>
+
+    <string name="uri_error">No file chosen</string>
+    <string name="file_not_found_error">File not found</string>
+    <string name="file_read_error">Can\'t read file</string>
+    <string name="csv_parse_error">Can\'t parse file</string>
 </resources>

@@ -1,4 +1,4 @@
-package com.umnvd.sensetestapp.views.plot;
+package com.umnvd.sensetestapp.views;
 
 import android.annotation.SuppressLint;
 import android.content.Context;

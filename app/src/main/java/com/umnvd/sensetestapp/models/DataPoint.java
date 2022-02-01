@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 import java.util.Objects;
 
 public class DataPoint implements Comparable<DataPoint> {
+
     public final int x;
     public final int y;
 
@@ -19,24 +20,17 @@ public class DataPoint implements Comparable<DataPoint> {
         return this.y - other.y;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
-        DataPoint dataPoint = (DataPoint) o;
-        return x == dataPoint.x && y == dataPoint.y;
-    }
+//    @Override
+//    public boolean equals(Object o) {
+//        if (this == o) return true;
+//        if (o == null || getClass() != o.getClass()) return false;
+//        DataPoint dataPoint = (DataPoint) o;
+//        return x == dataPoint.x && y == dataPoint.y;
+//    }
+//
+//    @Override
+//    public int hashCode() {
+//        return Objects.hash(x, y);
+//    }
 
-    @Override
-    public int hashCode() {
-        return Objects.hash(x, y);
-    }
-
-    @Override
-    public String toString() {
-        return "DataPoint{" +
-                "x=" + x +
-                ", y=" + y +
-                '}';
-    }
 }
