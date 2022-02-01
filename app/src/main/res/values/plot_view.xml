@@ -21,7 +21,7 @@
         <item name="graphColor">#4444FF</item>
         <item name="textColor">#000000</item>
         <item name="axesWidth">3dp</item>
-        <item name="gridWidth">1dp</item>
+        <item name="gridWidth">1.5dp</item>
         <item name="graphWidth">3dp</item>
     </style>
 

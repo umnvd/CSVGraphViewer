@@ -8,7 +8,10 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.PointF;
 import android.graphics.RectF;
+import android.os.Bundle;
+import android.os.Parcelable;
 import android.util.AttributeSet;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.View;
@@ -18,13 +21,18 @@ import androidx.annotation.Nullable;
 
 import com.umnvd.sensetestapp.R;
 import com.umnvd.sensetestapp.models.DataPoint;
-import static com.umnvd.sensetestapp.utils.Utils.*;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 public class PlotView extends View {
+
+    private static final String SUPER_STATE_KEY = "superState";
+    private static final String SCALE_KEY = "scale";
+    private static final String TRANSLATION_X_KEY = "translationX";
+    private static final String TRANSLATION_Y_KEY = "translationY";
+    private static final float SCALE_STEP = 0.25f;
 
     private float textSize;
     private int axesColor;
@@ -59,7 +67,7 @@ public class PlotView extends View {
     private int lastPointerId;
 
     private float scale = 1f;
-    private float maxScale = 2f;
+    private float maxScale = 1f;
     private float translationX = 0f;
     private float translationY = 0f;
 
@@ -68,10 +76,11 @@ public class PlotView extends View {
     private final Paint graphPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-    private final float maxGridStep = getContext().getResources().getDimension(R.dimen.max_grid_step);
+    private final float maxGridStep;
 
     public PlotView(Context context, @Nullable AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
+        maxGridStep = context.getResources().getDisplayMetrics().density * 100f;
         initAttributes(attrs, defStyleAttr, defStyleRes);
         configurePaints();
     }
@@ -86,6 +95,30 @@ public class PlotView extends View {
 
     public PlotView(Context context) {
         this(context, null);
+    }
+
+    @Nullable
+    @Override
+    protected Parcelable onSaveInstanceState() {
+        Bundle bundle = new Bundle();
+        bundle.putParcelable(SUPER_STATE_KEY, super.onSaveInstanceState());
+        bundle.putFloat(SCALE_KEY, scale);
+        bundle.putFloat(TRANSLATION_X_KEY, translationX);
+        bundle.putFloat(TRANSLATION_Y_KEY, translationY);
+        return bundle;
+    }
+
+    @Override
+    protected void onRestoreInstanceState(Parcelable state) {
+        if (state instanceof Bundle) {
+            Bundle bundle = (Bundle) state;
+            state = bundle.getParcelable(SUPER_STATE_KEY);
+            scale = bundle.getFloat(SCALE_KEY);
+            translationX = bundle.getFloat(TRANSLATION_X_KEY);
+            translationY = bundle.getFloat(TRANSLATION_Y_KEY);
+            Log.d("PlotView", "tx " + translationX + ", ty " + translationY + ", scale " + scale);
+        }
+        super.onRestoreInstanceState(state);
     }
 
     @Override
@@ -129,18 +162,14 @@ public class PlotView extends View {
         stepY = plotRect.height() / Math.max((yAxisPoints.size() - 1), 1);
         maxScale = maxGridStep / Math.min(stepX, stepY);
 
-        updatePlot();
+        restrictTranslations();
+        recalculatePlot();
     }
 
     @Override
     protected void onDraw(Canvas canvas) {
         drawGrid(canvas);
-
-        canvas.save();
-        canvas.clipRect(plotRect);
         drawGraph(canvas);
-        canvas.restore();
-
         drawAxesAndMarks(canvas);
     }
 
@@ -227,12 +256,12 @@ public class PlotView extends View {
 
     private void setUpAxesPoints(DataPoint minAxesPoint, DataPoint maxAxesPoint) {
         xAxisPoints.clear();
-        for (int x = minAxesPoint.x; x <= maxAxesPoint.x + 1; x++) {
+        for (int x = minAxesPoint.x; x <= maxAxesPoint.x; x++) {
             xAxisPoints.add(new PlotPoint(x, yAxisShift));
         }
 
         yAxisPoints.clear();
-        for (int y = minAxesPoint.y; y <= maxAxesPoint.y + 1; y++) {
+        for (int y = minAxesPoint.y; y <= maxAxesPoint.y; y++) {
             yAxisPoints.add(new PlotPoint(xAxisShift, y));
         }
     }
@@ -255,19 +284,19 @@ public class PlotView extends View {
         textCenterDeviation = (fontMetrics.descent + fontMetrics.ascent) / 2f;
     }
 
-    private void updateAndInvalidate() {
-        updatePlot();
+    private void updatePlot() {
+        recalculatePlot();
         invalidate();
     }
 
-    private void updatePlot() {
-        for (PlotPoint graphPoint : graphPoints) graphPoint.update();
-        for (PlotPoint xAxisPoint : xAxisPoints) xAxisPoint.update();
-        for (PlotPoint yAxisPoint : yAxisPoints) yAxisPoint.update();
-        updateGridStepsMultipliers();
+    private void recalculatePlot() {
+        for (PlotPoint graphPoint : graphPoints) graphPoint.recalculate();
+        for (PlotPoint xAxisPoint : xAxisPoints) xAxisPoint.recalculate();
+        for (PlotPoint yAxisPoint : yAxisPoints) yAxisPoint.recalculate();
+        recalculateGridStepsMultipliers();
     }
 
-    private void updateGridStepsMultipliers() {
+    private void recalculateGridStepsMultipliers() {
         xGridStepMultiplier = 1;
         while (true) {
             if (stepX * scale * xGridStepMultiplier > maxXTextWidth * 1.25f) break;
@@ -298,6 +327,9 @@ public class PlotView extends View {
     }
 
     private void drawGraph(Canvas canvas) {
+        int clipRestoreCount = canvas.save();
+        canvas.clipRect(plotRect);
+
         for (int i = 1; i < graphPoints.size(); i++) {
             PlotPoint fromPoint = graphPoints.get(i - 1);
             PlotPoint toPoint = graphPoints.get(i);
@@ -305,6 +337,8 @@ public class PlotView extends View {
                 canvas.drawLine(fromPoint.x, fromPoint.y, toPoint.x, toPoint.y, graphPaint);
             }
         }
+
+        canvas.restoreToCount(clipRestoreCount);
     }
 
     private void drawAxesAndMarks(Canvas canvas) {
@@ -365,7 +399,7 @@ public class PlotView extends View {
                     translationX += event.getX() - lastEventPoint.x;
                     translationY += event.getY() - lastEventPoint.y;
                     restrictTranslations();
-                    updateAndInvalidate();
+                    updatePlot();
                 }
 
                 lastEventPoint.set(event.getX(), event.getY());
@@ -406,14 +440,14 @@ public class PlotView extends View {
         public PlotPoint(int originalX, int originalY) {
             this.originalX = originalX;
             this.originalY = originalY;
-            update();
+            recalculate();
         }
 
         public PlotPoint(DataPoint dataPoint) {
             this(dataPoint.x, dataPoint.y);
         }
 
-        public void update() {
+        public void recalculate() {
             x = plotRect.left + ((originalX - xAxisShift) * stepX * scale) + translationX;
             y = plotRect.bottom - ((originalY - yAxisShift) * stepY * scale) + translationY;
         }
@@ -422,12 +456,33 @@ public class PlotView extends View {
 
     private class ScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
 
+        private final PointF focus = new PointF();
+
+        @Override
+        public boolean onScaleBegin(ScaleGestureDetector detector) {
+            focus.set(detector.getFocusX(), detector.getFocusY());
+            return plotRect.contains(focus.x, focus.y);
+        }
+
         @Override
         public boolean onScale(ScaleGestureDetector detector) {
             if (detector == null) return false;
+            if (detector.getScaleFactor() < SCALE_STEP) return true;
+
+            float prevScale = scale;
+            float prevTranslationX = translationX;
+            float prevTranslationY = translationY;
+
             scale = coerceIn(1f, scale * detector.getScaleFactor(), maxScale);
+
+            translationX = (focus.x - plotRect.left)
+                    + (prevTranslationX + plotRect.left - focus.x) * scale / prevScale;
+
+            translationY = (focus.y - plotRect.bottom)
+                    + (prevTranslationY + plotRect.bottom - focus.y) * scale / prevScale;
+
             restrictTranslations();
-            updateAndInvalidate();
+            updatePlot();
             return true;
         }
 
