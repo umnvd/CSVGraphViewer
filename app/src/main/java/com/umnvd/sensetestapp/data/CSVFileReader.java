@@ -3,6 +3,7 @@ package com.umnvd.sensetestapp.data;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Handler;
 
 import androidx.annotation.StringRes;
 
@@ -24,6 +25,7 @@ public class CSVFileReader {
 
     private final ContentResolver contentResolver;
     private final ExecutorService executor;
+    private final Handler mainHandler;
 
     private Uri cachedUri;
     private List<DataPoint> cachedPoints;
@@ -37,20 +39,20 @@ public class CSVFileReader {
         return instance;
     }
 
-    public void read(Uri uri, SuccessCallback successCallback, ErrorCallBack errorCallBack) {
-        if (uri == cachedUri && !cachedPoints.isEmpty()) {
+    public void read(Uri uri, SuccessCallback successCallback, ErrorCallback errorCallBack) {
+        if (uri.equals(cachedUri) && cachedPoints != null && !cachedPoints.isEmpty()) {
             successCallback.onSuccess(cachedPoints);
         } else {
             executor.submit(() -> {
                 try {
                     List<DataPoint> points = readCSVFile(uri);
-                    if (successCallback != null) successCallback.onSuccess(points);
+                    postSuccess(points, successCallback);
                 } catch (FileNotFoundException e) {
-                    if (errorCallBack != null) errorCallBack.onError(R.string.file_not_found_error);
+                    postError(R.string.file_not_found_error, errorCallBack);
                 } catch (IOException e) {
-                    if (errorCallBack != null) errorCallBack.onError(R.string.file_read_error);
+                    postError(R.string.file_read_error, errorCallBack);
                 } catch (NumberFormatException e) {
-                    if (errorCallBack != null) errorCallBack.onError(R.string.csv_parse_error);
+                    postError(R.string.csv_parse_error, errorCallBack);
                 }
             });
         }
@@ -61,6 +63,7 @@ public class CSVFileReader {
         BufferedReader reader = new BufferedReader(
                 new InputStreamReader(contentResolver.openInputStream(uri))
         );
+
         String line;
         while ((line = reader.readLine()) != null) {
             String[] row = line.split(",");
@@ -75,12 +78,25 @@ public class CSVFileReader {
         return result;
     }
 
+    private void postSuccess(List<DataPoint> points, SuccessCallback callback) {
+        if (callback != null) {
+            mainHandler.post(() -> callback.onSuccess(points));
+        }
+    }
+
+    private void postError(int messageId, ErrorCallback callback) {
+        if (callback != null) {
+            mainHandler.post(() -> callback.onError(messageId));
+        }
+    }
+
     private CSVFileReader(Context applicationContext) {
         contentResolver = applicationContext.getContentResolver();
         executor = Executors.newSingleThreadExecutor();
+        mainHandler = new Handler(applicationContext.getMainLooper());
     }
 
     public interface SuccessCallback { void onSuccess(List<DataPoint> points);}
-    public interface ErrorCallBack { void onError(@StringRes int messageId);}
+    public interface ErrorCallback { void onError(@StringRes int messageId);}
 
 }

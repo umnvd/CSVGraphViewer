@@ -7,4 +7,5 @@
     <string name="file_not_found_error">File not found</string>
     <string name="file_read_error">Can\'t read file</string>
     <string name="csv_parse_error">Can\'t parse file</string>
+    <string name="some_error">Error</string>
 </resources>

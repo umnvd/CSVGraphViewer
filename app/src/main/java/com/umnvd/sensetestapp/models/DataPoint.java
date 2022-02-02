@@ -20,17 +20,4 @@ public class DataPoint implements Comparable<DataPoint> {
         return this.y - other.y;
     }
 
-//    @Override
-//    public boolean equals(Object o) {
-//        if (this == o) return true;
-//        if (o == null || getClass() != o.getClass()) return false;
-//        DataPoint dataPoint = (DataPoint) o;
-//        return x == dataPoint.x && y == dataPoint.y;
-//    }
-//
-//    @Override
-//    public int hashCode() {
-//        return Objects.hash(x, y);
-//    }
-
 }

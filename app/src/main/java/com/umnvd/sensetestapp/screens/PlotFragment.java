@@ -14,6 +14,8 @@ import com.umnvd.sensetestapp.R;
 import com.umnvd.sensetestapp.data.CSVFileReader;
 import com.umnvd.sensetestapp.views.PlotView;
 
+import java.io.IOException;
+
 public class PlotFragment extends Fragment {
 
     private static final String URI_KEY = "uri";
