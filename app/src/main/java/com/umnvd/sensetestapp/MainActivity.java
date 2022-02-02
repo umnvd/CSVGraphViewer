@@ -28,9 +28,6 @@ public class MainActivity extends AppCompatActivity implements Navigator {
         FragmentTransaction transaction = getSupportFragmentManager().beginTransaction();
         transaction.replace(R.id.mainContainer, fragment);
         if (addToBackstack) transaction.addToBackStack(null);
-        transaction.setCustomAnimations(
-                R.anim.enter, R.anim.exit, R.anim.pop_enter, R.anim.pop_exit
-        );
         transaction.commit();
     }
 
