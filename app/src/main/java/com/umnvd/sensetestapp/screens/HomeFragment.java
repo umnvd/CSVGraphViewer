@@ -1,4 +1,4 @@
-package com.umnvd.sensetestapp.ui;
+package com.umnvd.sensetestapp.screens;
 
 import android.net.Uri;
 import android.os.Bundle;
@@ -36,18 +36,17 @@ public class HomeFragment extends Fragment {
     public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         navigator = (Navigator) requireActivity();
-
         Button chooseFileButton = view.findViewById(R.id.chooseButton);
         chooseFileButton.setOnClickListener(v -> chooseFileLauncher.launch(null));
-    }
-
-    private void toast(@StringRes int messageId) {
-        Toast.makeText(requireContext(), messageId, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onDestroyView() {
         super.onDestroyView();
         navigator = null;
+    }
+
+    private void toast(@StringRes int messageId) {
+        Toast.makeText(requireContext(), messageId, Toast.LENGTH_SHORT).show();
     }
 }

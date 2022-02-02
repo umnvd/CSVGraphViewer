@@ -1,4 +1,4 @@
-package com.umnvd.sensetestapp.ui;
+package com.umnvd.sensetestapp.screens;
 
 import android.net.Uri;
 import android.os.Bundle;

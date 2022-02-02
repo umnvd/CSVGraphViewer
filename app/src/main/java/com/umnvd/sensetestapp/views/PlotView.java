@@ -116,7 +116,6 @@ public class PlotView extends View {
             scale = bundle.getFloat(SCALE_KEY);
             translationX = bundle.getFloat(TRANSLATION_X_KEY);
             translationY = bundle.getFloat(TRANSLATION_Y_KEY);
-            Log.d("PlotView", "tx " + translationX + ", ty " + translationY + ", scale " + scale);
         }
         super.onRestoreInstanceState(state);
     }
@@ -162,7 +161,6 @@ public class PlotView extends View {
         stepY = plotRect.height() / Math.max((yAxisPoints.size() - 1), 1);
         maxScale = maxGridStep / Math.min(stepX, stepY);
 
-        restrictTranslations();
         recalculatePlot();
     }
 
@@ -290,6 +288,7 @@ public class PlotView extends View {
     }
 
     private void recalculatePlot() {
+        restrictTranslations();
         for (PlotPoint graphPoint : graphPoints) graphPoint.recalculate();
         for (PlotPoint xAxisPoint : xAxisPoints) xAxisPoint.recalculate();
         for (PlotPoint yAxisPoint : yAxisPoints) yAxisPoint.recalculate();
@@ -398,7 +397,6 @@ public class PlotView extends View {
                 if (pointerId == lastPointerId) {
                     translationX += event.getX() - lastEventPoint.x;
                     translationY += event.getY() - lastEventPoint.y;
-                    restrictTranslations();
                     updatePlot();
                 }
 
@@ -414,14 +412,14 @@ public class PlotView extends View {
 
     private void restrictTranslations() {
         translationX = coerceIn(
-                plotRect.right - plotRect.right * scale,
+                plotRect.width() - plotRect.width() * scale,
                 translationX,
-                plotRect.left * scale - plotRect.left
+                0
         );
         translationY = coerceIn(
-                plotRect.top - plotRect.top * scale,
+                0,
                 translationY,
-                plotRect.bottom * scale - plotRect.bottom
+                plotRect.height() * scale - plotRect.height()
         );
     }
 
@@ -481,7 +479,6 @@ public class PlotView extends View {
             translationY = (focus.y - plotRect.bottom)
                     + (prevTranslationY + plotRect.bottom - focus.y) * scale / prevScale;
 
-            restrictTranslations();
             updatePlot();
             return true;
         }
